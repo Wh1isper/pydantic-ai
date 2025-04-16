@@ -378,6 +378,22 @@ class BedrockConverseModel(Model):
                         bedrock_messages.extend(await self._map_user_prompt(part))
                     elif isinstance(part, ToolReturnPart):
                         assert part.tool_call_id is not None
+                        if isinstance(part.content, BinaryContent):
+                            # FIXME: Model like nova cannot handle binary content
+                            if part.content.is_image:
+                                content = [
+                                    {
+                                        'image': {
+                                            'format': part.content.format,  # type: ignore
+                                            'source': {'bytes': part.content.data},
+                                        }
+                                    }
+                                ]
+                            else:
+                                content = [{'text': f'{part.content.format} is not supported yet.'}]
+                        else:
+                            content = [{'text': part.model_response_str()}]
+
                         bedrock_messages.append(
                             {
                                 'role': 'user',
@@ -385,13 +401,13 @@ class BedrockConverseModel(Model):
                                     {
                                         'toolResult': {
                                             'toolUseId': part.tool_call_id,
-                                            'content': [{'text': part.model_response_str()}],
+                                            'content': content,
                                             'status': 'success',
                                         }
                                     }
                                 ],
                             }
-                        )
+                        )  # type: ignore
                     elif isinstance(part, RetryPromptPart):
                         # TODO(Marcelo): We need to add a test here.
                         if part.tool_name is None:  # pragma: no cover

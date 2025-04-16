@@ -297,10 +297,26 @@ class AnthropicModel(Model):
                         async for content in self._map_user_prompt(request_part):
                             user_content_params.append(content)
                     elif isinstance(request_part, ToolReturnPart):
+                        if isinstance(request_part.content, BinaryContent):
+                            if request_part.content.is_image:
+                                content = [
+                                    ImageBlockParam(
+                                        source={
+                                            'data': io.BytesIO(request_part.content.data),
+                                            'media_type': request_part.content.media_type,
+                                            'type': 'base64',
+                                        },  # type: ignore
+                                        type='image',
+                                    )
+                                ]
+                            else:
+                                content = f'{request_part.content.format} is not supported yet.'
+                        else:
+                            content = request_part.model_response_str()
                         tool_result_block_param = ToolResultBlockParam(
                             tool_use_id=_guard_tool_call_id(t=request_part),
                             type='tool_result',
-                            content=request_part.model_response_str(),
+                            content=content,
                             is_error=False,
                         )
                         user_content_params.append(tool_result_block_param)
